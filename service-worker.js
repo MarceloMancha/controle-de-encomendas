@@ -1,4 +1,4 @@
-const CACHE_NAME = "controle-mercadorias-v2";
+const CACHE_NAME = "controle-mercadorias-v3";
 
 const urlsToCache = [
   "./",

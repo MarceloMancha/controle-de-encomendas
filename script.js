@@ -1,11 +1,16 @@
-// ================= VARIÁVEIS GLOBAIS =================
-let encomendas = JSON.parse(localStorage.getItem('encomendas')) || [];
+const CONFIG = {
+    NOME_SISTEMA: "Controle de Encomendas - Gate", 
+    ID_CLIENTE: "banco_dados_gate_v1",             
+};
+
+let encomendas = JSON.parse(localStorage.getItem(CONFIG.ID_CLIENTE)) || [];
 let selecionadaId = null;
 let canvas, ctx, desenhando = false;
+let html5QrCode;
 
-// ================= AGENDA DE MORADORES =================
+// Sua agenda de moradores aqui (Mantida conforme original)
 const agendaMoradores = {
-   "Gate002": "11994392466",
+    "Gate002": "11994392466",
     "Gate004": "11958649090",
     "Gate007": "11958649090",
     "Gate101": "11979861261",
@@ -49,14 +54,16 @@ const agendaMoradores = {
     "Gate326": "11986727868",
     "Gate401": "11994500123",
     "Gate402": "11984141218",
-    "Gate405": "11972079173", 
+    "Gate405": "11947342215",
+    "Gate406": "11913374949", 
     "Gate407": "11916991214",
+    "Gate412": "11916270842",
     "Gate413": "11946093516",
     "Gate414": "11998636282",
     "Gate417": "11964420087",
     "Gate418": "11976711191",
     "Gate419": "11976711191",
-    "Gate421": "11972079173",
+    "Gate421": "11947342215",
     "Gate422": "11940728668",
     "Gate423": "11968799892",
     "Gate424": "11999743530",
@@ -66,9 +73,9 @@ const agendaMoradores = {
     "Gate506": "11956800426",
     "Gate507": "11983156104",
     "Gate508": "11983156104",
-    "Gate510": "11972079173",
-    "Gate511": "11972079173",
-    "Gate512": "11972079173",
+    "Gate510": "11947342215",
+    "Gate511": "11947342215",
+    "Gate512": "11947342215",
     "Gate513": "11948286001",
     "Gate514": "11994781574",
     "Gate517": "11995971657",
@@ -99,7 +106,7 @@ const agendaMoradores = {
     "Gate626": "11959561324",
     "Gate701": "11945983290",
     "Gate702": "11945983290",
-    "Gate703": "11972079173",
+    "Gate703": "11947342215",
     "Gate704": "11975277222",
     "Gate705": "11982694905",
     "Gate707": "11974442284",
@@ -176,7 +183,8 @@ const agendaMoradores = {
     "Gate1107": "11943668324",
     "Gate1108": "11943668324",
     "Gate1110": "11971507476",
-    "Gate1112": "11940277289",
+    "Gate1111": "11983199665",
+    "Gate1112": "11940277289",    
     "Gate1113": "11943123167",
     "Gate1114": "1120609991",
     "Gate1115": "1120609991",
@@ -204,6 +212,7 @@ const agendaMoradores = {
     "Gate1214": "1155558872",
     "Gate1215": "1155558872",
     "Gate1216": "1155558872",
+    "Gate1217": "11954585251",
     "Gate1222": "11981289538",
     "Gate1223": "11986967125",
     "Gate1224": "11986967125",
@@ -308,6 +317,7 @@ const agendaMoradores = {
     "Way801": "11940183228",
     "Way802": "11958313345",
     "Way804": "11958313345",
+    "Way808": "11958313345",
     "Way810": "11958313345",
     "Way901": "11977119335",
     "Way902": "11950666086",
@@ -351,62 +361,53 @@ const agendaMoradores = {
     "Way1507": "11947502427",
 };
 
-// ================= INICIALIZAÇÃO =================
 window.onload = () => {
+    document.title = CONFIG.NOME_SISTEMA;
     renderizarTabela();
     atualizarDashboard();
     document.getElementById('sala').addEventListener('input', buscarContatoAutomatico);
     document.getElementById('torre').addEventListener('change', buscarContatoAutomatico);
 };
 
-// ================= FUNÇÕES DE APOIO =================
 function salvarEAtualizar() {
-    localStorage.setItem('encomendas', JSON.stringify(encomendas));
+    localStorage.setItem(CONFIG.ID_CLIENTE, JSON.stringify(encomendas));
     renderizarTabela();
     atualizarDashboard();
 }
 
 function buscarContatoAutomatico() {
     const torre = document.getElementById('torre').value;
-    const sala = document.getElementById('sala').value.trim();
+    const sala = document.getElementById('sala').value;
     const campoTelefone = document.getElementById('telefone');
     const chave = torre + sala;
-    if (agendaMoradores[chave]) {
-        campoTelefone.value = agendaMoradores[chave];
-        campoTelefone.style.backgroundColor = "#e8f5e9";
-    } else {
-        campoTelefone.style.backgroundColor = "";
-    }
+    campoTelefone.value = agendaMoradores[chave] || "";
+    campoTelefone.style.backgroundColor = agendaMoradores[chave] ? "#ecfdf5" : "";
 }
 
 function atualizarDashboard() {
     const hoje = new Date().toLocaleDateString('pt-BR');
-    const tHoje = encomendas.filter(e => e.data === hoje).length;
-    const tAguardando = encomendas.filter(e => e.status === 'Aguardando retirada').length;
-    const tRetirados = encomendas.filter(e => e.status === 'Retirado').length;
-    document.getElementById('dashTotal').innerText = tHoje;
-    document.getElementById('dashAguardando').innerText = tAguardando;
-    document.getElementById('dashRetirados').innerText = tRetirados;
+    document.getElementById('dashTotal').innerText = encomendas.filter(e => e.data === hoje).length;
+    document.getElementById('dashAguardando').innerText = encomendas.filter(e => e.status === 'Aguardando retirada').length;
+    document.getElementById('dashRetirados').innerText = encomendas.filter(e => e.status === 'Retirado').length;
 }
 
-// ================= WHATSAPP =================
 function enviarZap(item, tipo) {
     if (!item.telefone) return;
-    const tel = item.telefone.replace(/\D/g, '');
-    let msg = "";
-    if (tipo === 'chegada') {
-        msg = `Olá, *${item.destinatario}*! 📦\nSua encomenda (NF: *${item.nf}*) chegou no -1 setor de Encomendas.\n*Sala ${item.sala}* (${item.torre}).`;
-    } else {
-        msg = `✅ *Confirmação de Retirada*\nOlá, *${item.destinatario}*!\nSua encomenda (NF: *${item.nf}*) foi retirada por *${item.quemRetirou}* em ${item.dataRetirada}.`;
-    }
-    window.open(`https://api.whatsapp.com/send?phone=55${tel}&text=${encodeURIComponent(msg)}`, '_blank');
+    const agora = new Date();
+    const min = (agora.getHours() * 60) + agora.getMinutes();
+    let saudacao = (min < 720) ? "Bom dia" : (min <= 1110) ? "Boa tarde" : "Boa noite";
+    
+    let msg = (tipo === 'chegada') 
+        ? `${saudacao}, *${item.destinatario}*! 📦\nSua encomenda (NF: *${item.nf}*) chegou no -1 setor de Encomendas.\n*Sala ${item.sala}* (${item.torre}).`
+        : `✅ *Retirada Confirmada*\n${saudacao}, *${item.destinatario}*!\nSua encomenda (NF: *${item.nf}*) foi retirada por *${item.quemRetirou}* em ${item.dataRetirada}.`;
+
+    window.open(`https://api.whatsapp.com/send?phone=55${item.telefone.replace(/\D/g, '')}&text=${encodeURIComponent(msg)}`, '_blank');
 }
 
-// ================= CADASTRO E EDIÇÃO =================
+// SALVAR ENCOMENDA
 document.getElementById('formRecebimento').addEventListener('submit', function(e) {
     e.preventDefault();
     const idExistente = document.getElementById('editId').value;
-
     const dados = {
         nf: document.getElementById('notaFiscal').value,
         torre: document.getElementById('torre').value,
@@ -420,47 +421,15 @@ document.getElementById('formRecebimento').addEventListener('submit', function(e
         encomendas[index] = { ...encomendas[index], ...dados };
         cancelarEdicao();
     } else {
-        const nova = {
-            id: Date.now(),
-            ...dados,
-            data: new Date().toLocaleDateString('pt-BR'),
-            status: 'Aguardando retirada',
-            quemRetirou: '',
-            dataRetirada: '',
-            assinatura: ''
-        };
+        const nova = { id: Date.now(), ...dados, data: new Date().toLocaleDateString('pt-BR'), status: 'Aguardando retirada', quemRetirou: '', dataRetirada: '', assinatura: '' };
         encomendas.push(nova);
         enviarZap(nova, 'chegada');
     }
-
     salvarEAtualizar();
     this.reset();
+    document.getElementById('telefone').style.backgroundColor = "";
 });
 
-function editar(id) {
-    const item = encomendas.find(e => e.id === id);
-    if (!item) return;
-    document.getElementById('editId').value = item.id;
-    document.getElementById('notaFiscal').value = item.nf;
-    document.getElementById('torre').value = item.torre;
-    document.getElementById('sala').value = item.sala;
-    document.getElementById('destinatario').value = item.destinatario;
-    document.getElementById('telefone').value = item.telefone;
-    document.getElementById('tituloForm').innerText = "✏️ Editar Encomenda";
-    document.getElementById('btnSalvar').innerText = "Atualizar Encomenda";
-    document.getElementById('btnCancelarEdit').style.display = "block";
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function cancelarEdicao() {
-    document.getElementById('formRecebimento').reset();
-    document.getElementById('editId').value = "";
-    document.getElementById('tituloForm').innerText = "📦 Novo Recebimento";
-    document.getElementById('btnSalvar').innerText = "Salvar Mercadoria";
-    document.getElementById('btnCancelarEdit').style.display = "none";
-}
-
-// ================= FILTROS E TABELA =================
 function aplicarFiltros() {
     const fData = document.getElementById('filtroData').value; 
     const fSala = document.getElementById('filtroSala').value.toLowerCase();
@@ -469,106 +438,104 @@ function aplicarFiltros() {
     const fStatus = document.getElementById('filtroStatus').value;
 
     const filtrados = encomendas.filter(e => {
-        const dataFormatada = e.data.split('/').reverse().join('-');
-        return (fData === "" || dataFormatada === fData) &&
-               (fSala === "" || e.sala.toLowerCase().includes(fSala)) &&
-               (fNome === "" || e.destinatario.toLowerCase().includes(fNome)) &&
-               (fNF === "" || e.nf.toLowerCase().includes(fNF)) &&
-               (fStatus === "" || e.status === fStatus);
+        const dt = e.data.split('/').reverse().join('-');
+        const bateData = fData === "" || dt === fData;
+        const bateSala = fSala === "" || e.sala.toLowerCase().includes(fSala);
+        const bateNome = fNome === "" || e.destinatario.toLowerCase().includes(fNome);
+        const bateNF = fNF === "" || e.nf.toLowerCase().includes(fNF);
+        const bateStatus = fStatus === "" || e.status === fStatus;
+
+        return bateData && bateSala && bateNome && bateNF && bateStatus;
     });
-    
+
     renderizarTabela(filtrados);
+
+    const detalhesDiv = document.getElementById('resultadoConteudo');
     
-    if (filtrados.length > 0) {
-        mostrarMultiplosDetalhes(filtrados);
-    } else {
-        document.getElementById('resultadoConteudo').innerHTML = '<p class="placeholder-text">Nenhum resultado encontrado.</p>';
+    if(fSala || fNome || fNF || fData || fStatus) {
+        if(filtrados.length > 0) {
+            let html = `<div class="grid-previa">`;
+            // REMOVIDO O .slice(0, 6) PARA MOSTRAR TODOS
+            filtrados.forEach(item => {
+                const corStatus = item.status === 'Retirado' ? '#e2e8f0' : '#d1fae5';
+                html += `
+                    <div class="mini-card" onclick="selecionarUnica(${item.id})" style="background: ${corStatus}">
+                        <strong>Sala ${item.sala}</strong>
+                        <span>${item.destinatario.split(' ')[0]}</span>
+                        <small>${item.status === 'Retirado' ? '✅' : '📦'}</small>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+            detalhesDiv.innerHTML = html;
+        } else {
+            detalhesDiv.innerHTML = `<p style="color:red">Nenhuma encomenda encontrada.</p>`;
+        }
         document.getElementById('blocoConfirmarRetirada').style.display = 'none';
     }
 }
 
 function renderizarTabela(dados = encomendas) {
     const corpo = document.getElementById('listaCorpo');
-    if (!corpo) return;
     corpo.innerHTML = '';
 
-    // LÓGICA DE ORDENAÇÃO PEDIDA
+    // --- TRECHO DA NOVA ORDENAÇÃO ---
     const ordenados = [...dados].sort((a, b) => {
-        // 1. Por Data (Crescente)
+        // 1. Ordena por Data (mais recente primeiro)
         const dataA = a.data.split('/').reverse().join('');
         const dataB = b.data.split('/').reverse().join('');
-        if (dataA !== dataB) return dataA.localeCompare(dataB);
+        if (dataA !== dataB) return dataB.localeCompare(dataA);
 
-        // 2. Por Torre (Gate primeiro, depois Way)
-        if (a.torre !== b.torre) {
-            return a.torre === "Gate" ? -1 : 1;
-        }
+        // 2. Ordena por Torre (Gate primeiro, Way depois)
+        if (a.torre !== b.torre) return a.torre.localeCompare(b.torre);
 
-        // 3. Por Sala (Crescente numérica)
-        const salaA = parseInt(a.sala.replace(/\D/g, '')) || 0;
-        const salaB = parseInt(b.sala.replace(/\D/g, '')) || 0;
-        return salaA - salaB;
+        // 3. Ordena por Sala (Crescente)
+        // Usamos o replace(/\D/g, '') para garantir que trate como número se houver letras
+        return parseInt(a.sala.replace(/\D/g, '')) - parseInt(b.sala.replace(/\D/g, ''));
     });
+    // --------------------------------
 
     ordenados.forEach(item => {
+        // ... resto do código (o tr.onclick e o innerHTML continuam iguais)
         const tr = document.createElement('tr');
-        tr.onclick = (e) => { if (e.target.tagName !== 'BUTTON') selecionarUnica(item.id); };
+        tr.onclick = () => selecionarUnica(item.id);
         tr.innerHTML = `
-            <td>${item.data}</td>
-            <td>${item.nf}</td>
-            <td style="font-weight:bold; color:#2563eb;">${item.sala}</td>
-            <td>${item.torre}</td>
-            <td>${item.destinatario}</td>
-            <td style="font-weight:bold; color:${item.status === 'Retirado' ? 'green' : '#f59e0b'}">${item.status}</td>
+            <td>${item.data}</td><td>${item.nf}</td>
+            <td style="font-weight:bold; color:#059669;">${item.sala}</td>
+            <td>${item.torre}</td><td>${item.destinatario}</td>
+            <td style="font-weight:bold; color:${item.status === 'Retirado' ? '#059669' : '#d97706'}">${item.status}</td>
             <td>
-                <button onclick="event.stopPropagation(); editar(${item.id})" title="Editar">✏️</button>
-                <button onclick="event.stopPropagation(); apagar(${item.id})" title="Excluir">🗑️</button>
+                <button onclick="event.stopPropagation(); editar(${item.id})">✏️</button>
+                <button onclick="event.stopPropagation(); apagar(${item.id})">🗑️</button>
             </td>
         `;
         corpo.appendChild(tr);
     });
 }
 
-// ================= DETALHES E ASSINATURA =================
-
-function mostrarMultiplosDetalhes(itens) {
-    const conteudo = document.getElementById('resultadoConteudo');
-    conteudo.innerHTML = `<p style="margin-bottom:10px; font-weight:bold; color:#2563eb;">Exibindo ${itens.length} resultado(s):</p>`;
-    
-    itens.forEach(item => {
-        const div = document.createElement('div');
-        div.style = "border: 1px solid #ddd; border-left: 5px solid #2563eb; background: #fff; padding: 10px; border-radius: 5px; margin-bottom: 8px; cursor: pointer; font-size: 0.9em;";
-        div.onclick = () => selecionarUnica(item.id);
-        div.innerHTML = `
-            <strong>NF: ${item.nf}</strong> | Sala: ${item.sala} (${item.torre})<br>
-            👤 ${item.destinatario}<br>
-            <span style="color:${item.status === 'Retirado' ? 'green' : '#f59e0b'}">● ${item.status}</span>
-        `;
-        conteudo.appendChild(div);
-    });
-    document.getElementById('blocoConfirmarRetirada').style.display = 'none';
-}
-
 function selecionarUnica(id) {
     selecionadaId = id;
     const item = encomendas.find(e => e.id === id);
-    if (!item) return;
     
+    // Foca na seção de detalhes
+    document.getElementById('secao-detalhes').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
     document.getElementById('resultadoConteudo').innerHTML = `
-        <div style="border-left:5px solid #2563eb; background:#fff; padding:15px; border-radius:8px;">
-            <p><strong>📦 NF:</strong> ${item.nf} | <strong>Sala:</strong> ${item.sala} (${item.torre})</p>
-            <p><strong>👤 Nome:</strong> ${item.destinatario}</p>
-            <p><strong>🚩 Status:</strong> ${item.status}</p>
+        <div style="border-left:5px solid #059669; background:#fff; padding:15px; border-radius:8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #d1fae5;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                   <p style="margin:2px 0;"><strong>📦 NF:</strong> ${item.nf} | <strong>Sala:</strong> ${item.sala} (${item.torre})</p>
+                   <p style="margin:2px 0;"><strong>👤 Nome:</strong> ${item.destinatario}</p>
+                   <p style="margin:2px 0;"><strong>🚩 Status:</strong> ${item.status}</p>
+                </div>
+                <button onclick="visualizarTudo()" style="background:#f3f4f6; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">X</button>
+            </div>
             ${item.status === 'Retirado' ? `
                 <div style="margin-top:10px; border-top:1px solid #eee; padding-top:10px;">
-                    <p style="color:green">✅ Retirado por: ${item.quemRetirou}</p>
-                    <p><small>${item.dataRetirada}</small></p>
-                    <p><strong>Assinatura:</strong></p>
-                    <img src="${item.assinatura}" style="width:100%; border:1px solid #ddd; background:#fff;" />
+                    <p style="color:#059669; font-weight:bold;">✅ Retirado por: ${item.quemRetirou} em ${item.dataRetirada}</p>
+                    <img src="${item.assinatura}" style="width:100%; max-width:300px; border:1px solid #ddd; background:#fff;" />
                 </div>
-            ` : `
-                <button onclick="enviarZapManual(${item.id})" style="background:#25d366; color:white; border:none; padding:10px; width:100%; border-radius:5px; cursor:pointer; margin-top:10px;">Reenviar Aviso</button>
-            `}
+            ` : `<button onclick="enviarZapManual(${item.id})" style="background:#22c55e; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; margin-top:10px; font-weight:bold;">Reenviar WhatsApp</button>`}
         </div>
     `;
 
@@ -581,17 +548,17 @@ function selecionarUnica(id) {
     }
 }
 
+// LÓGICA DE ASSINATURA E OUTROS (MANTIDA IGUAL)
 function configurarCanvas() {
     canvas = document.getElementById('canvasAssinatura');
-    if (!canvas) return;
     ctx = canvas.getContext('2d');
     ctx.lineWidth = 2;
-    ctx.strokeStyle = "#000";
+    ctx.strokeStyle = "#064e3b";
     const getPos = (e) => {
         const rect = canvas.getBoundingClientRect();
-        const cx = e.clientX || e.touches[0].clientX;
-        const cy = e.clientY || e.touches[0].clientY;
-        return { x: cx - rect.left, y: cy - rect.top };
+        const cx = (e.clientX || (e.touches && e.touches[0].clientX));
+        const cy = (e.clientY || (e.touches && e.touches[0].clientY));
+        return { x: (cx - rect.left) * (canvas.width / rect.width), y: (cy - rect.top) * (canvas.height / rect.height) };
     };
     canvas.onmousedown = (e) => { desenhando = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); };
     canvas.onmousemove = (e) => { if(desenhando) { const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); } };
@@ -603,16 +570,14 @@ function configurarCanvas() {
 
 function finalizarEntrega() {
     const nome = document.getElementById('nomeRec').value;
-    if(!nome) return alert("Quem está retirando?");
+    if(!nome) return alert("Informe quem está retirando.");
     const index = encomendas.findIndex(e => e.id === selecionadaId);
     
     const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = canvas.width;
-    tempCanvas.height = canvas.height;
-    const tempCtx = tempCanvas.getContext('2d');
-    tempCtx.fillStyle = "#ffffff";
-    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-    tempCtx.drawImage(canvas, 0, 0);
+    tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
+    const tCtx = tempCanvas.getContext('2d');
+    tCtx.fillStyle = "#fff"; tCtx.fillRect(0,0,canvas.width,canvas.height);
+    tCtx.drawImage(canvas, 0, 0);
 
     encomendas[index].status = 'Retirado';
     encomendas[index].quemRetirou = nome;
@@ -627,45 +592,56 @@ function finalizarEntrega() {
 }
 
 function limparAssinatura() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
-function enviarZapManual(id) { enviarZap(encomendas.find(e => e.id === id), 'chegada'); }
-
-// MODIFICADA: Agora limpa tudo de fato
-function visualizarTudo() {
-    document.getElementById('filtroData').value = "";
-    document.getElementById('filtroSala').value = "";
-    document.getElementById('filtroNome').value = "";
-    document.getElementById('filtroNF').value = "";
-    document.getElementById('filtroStatus').value = "";
-    renderizarTabela(encomendas);
-    document.getElementById('resultadoConteudo').innerHTML = '<p class="placeholder-text">Clique em uma nota ou use os filtros.</p>';
+function visualizarTudo() { 
+    ['filtroData', 'filtroSala', 'filtroNome', 'filtroNF', 'filtroStatus'].forEach(id => document.getElementById(id).value = ""); 
+    document.getElementById('resultadoConteudo').innerHTML = `<p>Use os filtros acima para buscar ou selecione na lista.</p>`;
     document.getElementById('blocoConfirmarRetirada').style.display = 'none';
+    renderizarTabela(); 
+}
+function apagar(id) { if(confirm("Excluir?")) { encomendas = encomendas.filter(e => e.id !== id); salvarEAtualizar(); } }
+
+function editar(id) {
+    const item = encomendas.find(e => e.id === id);
+    document.getElementById('editId').value = item.id;
+    document.getElementById('notaFiscal').value = item.nf;
+    document.getElementById('torre').value = item.torre;
+    document.getElementById('sala').value = item.sala;
+    document.getElementById('destinatario').value = item.destinatario;
+    document.getElementById('telefone').value = item.telefone;
+    document.getElementById('tituloForm').innerText = "✏️ Editar Encomenda";
+    document.getElementById('btnSalvar').innerText = "Atualizar";
+    document.getElementById('btnCancelarEdit').style.display = "block";
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function apagar(id) {
-    if(confirm("Deseja realmente excluir esta encomenda?")) {
-        encomendas = encomendas.filter(e => e.id !== id);
-        salvarEAtualizar();
-        document.getElementById('resultadoConteudo').innerHTML = '<p class="placeholder-text">Clique em uma nota.</p>';
-        document.getElementById('blocoConfirmarRetirada').style.display = 'none';
-    }
+function cancelarEdicao() {
+    document.getElementById('formRecebimento').reset();
+    document.getElementById('editId').value = "";
+    document.getElementById('tituloForm').innerText = "📦 Novo Recebimento";
+    document.getElementById('btnSalvar').innerText = "Salvar e Avisar Morador";
+    document.getElementById('btnCancelarEdit').style.display = "none";
 }
 
-// ================= EXPORTAÇÃO EXCEL (CSV) =================
 function exportarCSV() {
-    if (encomendas.length === 0) return alert("Nenhuma mercadoria para exportar.");
-    let csv = "\ufeff"; 
-    csv += "Data;NF;Torre;Sala;Destinatario;Status;Quem Retirou;Data Retirada\n";
-    encomendas.forEach(e => {
-        csv += `${e.data};${e.nf};${e.torre};${e.sala};${e.destinatario};${e.status};${e.quemRetirou};${e.dataRetirada}\n`;
-    });
+    let csv = "\ufeffData;NF;Torre;Sala;Destinatario;Status;Quem Retirou\n";
+    encomendas.forEach(e => csv += `${e.data};${e.nf};${e.torre};${e.sala};${e.destinatario};${e.status};${e.quemRetirou}\n`);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Relatorio_Encomendas_${new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
+    link.href = URL.createObjectURL(blob);
+    link.download = `Relatorio.csv`;
     link.click();
-    document.body.removeChild(link);
-
 }
+
+window.onscroll = () => { document.getElementById("btnTopo").style.display = (window.scrollY > 300) ? "block" : "none"; };
+function voltarAoTopo() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+
+function iniciarLeitor() {
+    document.getElementById('area-scanner').style.display = 'block';
+    html5QrCode = new Html5Qrcode("reader");
+    html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => {
+        document.getElementById('notaFiscal').value = text;
+        pararLeitor();
+    }).catch(err => alert("Erro na câmera"));
+}
+function pararLeitor() { if(html5QrCode) html5QrCode.stop().then(() => document.getElementById('area-scanner').style.display = 'none'); }
+function enviarZapManual(id) { enviarZap(encomendas.find(e => e.id === id), 'chegada'); }

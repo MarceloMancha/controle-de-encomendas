@@ -1,7 +1,8 @@
 {
-  "name": "Controle de Encomendas",
-  "short_name": "Encomendas",
-  "start_url": "/",
+  "name": "Controle de Mercadorias Pro",
+  "short_name": "Mercadorias",
+  "start_url": "/controle-de-encomendas/",
+  "scope": "/controle-de-encomendas/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0d6efd",
